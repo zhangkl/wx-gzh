@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>分类管理</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div class="layout"><aside id="sidebar" class="sidebar"></aside><main class="main">
+  <div class="topbar"><h2>分类管理</h2></div>
+  <div class="card" style="max-width:780px">
+    <div class="form-row"><label>分类名称 *</label><input id="name" placeholder="请输入分类名称"></div>
+    <div class="form-row"><label>分类描述</label><textarea id="desc" rows="3" placeholder="请输入分类描述（选填）"></textarea></div>
+    <div class="form-row"><label>分类图标 *</label><div class="icons" id="icons"></div></div>
+    <div class="form-row"><label>排序权重</label><input id="weight" type="number" value="0"></div>
+    <div class="form-row"><label>启用状态</label><select id="enabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+    <button class="btn primary" id="save">确认添加</button>
+  </div>
+
+  <table class="table" id="list"><thead><tr><th>名称</th><th>描述</th><th>图标</th><th>权重</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table>
+</main></div>
+<script src="/app.js"></script>
+<script>
+mountSidebar('category');
+const iconList = ['➕', '👤', '🟢', '👜', '🚚', '⏰', '📄', '👑', '⚙️'];
+let selected = iconList[0];
+
+function renderIcons() {
+  icons.innerHTML = iconList.map(i => `<button class="icon-btn ${i === selected ? 'active' : ''}" data-icon="${i}">${i}</button>`).join('');
+}
+
+icons.onclick = (e) => {
+  const icon = e.target.dataset.icon;
+  if (!icon) return;
+  selected = icon;
+  renderIcons();
+};
+
+async function load() {
+  const data = await api('/api/categories');
+  list.querySelector('tbody').innerHTML = data.map(c => `
+    <tr>
+      <td>${c.name}</td>
+      <td>${c.description || '-'}</td>
+      <td>${c.icon}</td>
+      <td>${c.sortWeight}</td>
+      <td>${c.enabled ? '启用' : '禁用'}</td>
+      <td><a href="#" data-toggle="${c.id}">${c.enabled ? '禁用' : '启用'}</a> | <a href="#" data-del="${c.id}">删除</a></td>
+    </tr>`).join('');
+}
+
+save.onclick = async () => {
+  if (!name.value.trim()) return alert('请填写分类名称');
+  await api('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: name.value.trim(),
+      description: desc.value.trim(),
+      icon: selected,
+      sortWeight: Number(weight.value),
+      enabled: enabled.value === 'true'
+    })
+  });
+  name.value = '';
+  desc.value = '';
+  weight.value = 0;
+  await load();
+};
+
+list.onclick = async (e) => {
+  const toggleId = e.target.dataset.toggle;
+  const delId = e.target.dataset.del;
+  if (toggleId) {
+    e.preventDefault();
+    const row = (await api('/api/categories')).find(c => c.id === Number(toggleId));
+    await api(`/api/categories/${toggleId}`, { method: 'PUT', body: JSON.stringify({ enabled: !row.enabled }) });
+    return load();
+  }
+  if (delId) {
+    e.preventDefault();
+    if (!confirm('确认删除分类？')) return;
+    try {
+      await api(`/api/categories/${delId}`, { method: 'DELETE' });
+    } catch (error) {
+      alert(error.message);
+    }
+    return load();
+  }
+};
+
+renderIcons();
+load();
+</script>
+</body>
+</html>

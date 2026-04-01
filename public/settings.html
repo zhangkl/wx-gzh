@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>系统配置</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div class="layout"><aside id="sidebar" class="sidebar"></aside><main class="main">
+  <div class="topbar"><h2>系统配置</h2></div>
+  <div class="card" style="max-width:680px">
+    <div class="form-row"><label>站点名称</label><input id="siteName"></div>
+    <div class="form-row"><label><input type="checkbox" id="allowPublicFeedback"> 允许公开反馈</label></div>
+    <div class="form-row"><label><input type="checkbox" id="reviewRequired"> 文档发布需审核</label></div>
+    <button class="btn primary" id="save">保存配置</button>
+  </div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+mountSidebar('settings');
+async function init() {
+  const s = await api('/api/settings');
+  siteName.value = s.siteName;
+  allowPublicFeedback.checked = s.allowPublicFeedback;
+  reviewRequired.checked = s.reviewRequired;
+}
+save.onclick = async () => {
+  await api('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify({
+      siteName: siteName.value,
+      allowPublicFeedback: allowPublicFeedback.checked,
+      reviewRequired: reviewRequired.checked
+    })
+  });
+  alert('保存成功');
+};
+init();
+</script>
+</body>
+</html>
