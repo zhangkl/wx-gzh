@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>编辑文档</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div class="layout"><aside id="sidebar" class="sidebar"></aside><main class="main">
+  <div class="topbar"><h2>编辑文档</h2><div><button id="saveDraft" class="btn ghost">保存草稿</button> <button id="publish" class="btn primary">发布</button></div></div>
+  <div class="panel">
+    <section class="card">
+      <div class="form-row"><label>文档标题 *</label><input id="title"></div>
+      <div class="form-row"><label>所属分类 *</label><select id="category"></select></div>
+      <div class="form-row"><label>关键词（逗号分隔）</label><input id="keywords"></div>
+      <div class="form-row"><label>排序权重</label><input id="sortWeight" type="number" value="0"></div>
+      <div class="form-row"><label><input type="checkbox" id="isHot"> 热门标记</label></div>
+      <div class="form-row"><label>文档内容 *</label><textarea id="content" class="editor"></textarea></div>
+      <div class="notice">支持“新增”和“编辑”两种模式。编辑模式可通过 URL 参数 <code>?id=xx</code> 打开。</div>
+    </section>
+    <aside class="card">
+      <h3>文档信息</h3>
+      <p id="meta" class="muted">新文档尚未发布</p>
+      <h4>相关文档</h4>
+      <ul id="related" class="muted"></ul>
+    </aside>
+  </div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+mountSidebar('edit');
+const qs = new URLSearchParams(location.search);
+const editId = qs.get('id');
+let allArticles = [];
+
+async function loadBase() {
+  const [cats, result] = await Promise.all([
+    api('/api/categories'),
+    api('/api/articles?page=1&pageSize=100')
+  ]);
+  allArticles = result.list;
+  category.innerHTML = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  related.innerHTML = allArticles.slice(0, 5).map(a => `<li>${a.title}</li>`).join('');
+}
+
+async function loadDetail() {
+  if (!editId) return;
+  const article = await api(`/api/articles/${editId}`);
+  title.value = article.title;
+  category.value = article.categoryId;
+  keywords.value = article.keywords.join(',');
+  content.value = article.content;
+  isHot.checked = article.isHot;
+  meta.textContent = `最后更新 ${article.updatedAt} · 浏览 ${article.views} · 有用率 ${fmtPercent(article.usefulRate)}`;
+}
+
+async function submit(status) {
+  if (!title.value.trim() || !content.value.trim()) return alert('标题和正文必填');
+  const payload = {
+    title: title.value.trim(),
+    categoryId: Number(category.value),
+    keywords: keywords.value.split(',').map(s => s.trim()).filter(Boolean),
+    sortWeight: Number(sortWeight.value),
+    isHot: isHot.checked,
+    content: content.value,
+    status
+  };
+  if (editId) {
+    await api(`/api/articles/${editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+  } else {
+    await api('/api/articles', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  alert(status === 'draft' ? '草稿已保存' : '文档已发布');
+  location.href = '/index.html';
+}
+
+saveDraft.onclick = () => submit('draft');
+publish.onclick = () => submit('published');
+
+(async function init() {
+  await loadBase();
+  await loadDetail();
+})();
+</script>
+</body>
+</html>

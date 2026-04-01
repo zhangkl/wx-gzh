@@ -1,0 +1,10 @@
+{
+  "name": "wx-gzh-help-center",
+  "version": "1.1.0",
+  "description": "帮助中心知识库管理后台与前端页面",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check data/repository.js"
+  }
+}

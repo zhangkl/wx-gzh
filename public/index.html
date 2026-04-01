@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>内容列表</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div class="layout"><aside id="sidebar" class="sidebar"></aside><main class="main">
+  <div class="topbar"><h2>内容列表</h2><a class="btn primary" href="/edit.html">+ 新增文档</a></div>
+  <div class="card">
+    <div class="toolbar">
+      <input id="q" placeholder="搜索文档标题/关键词">
+      <select id="category"></select>
+      <select id="status"><option value="">全部状态</option><option value="published">已发布</option><option value="draft">草稿</option></select>
+      <button class="btn primary" id="searchBtn">筛选</button>
+      <button class="btn ghost" id="resetBtn">重置</button>
+    </div>
+    <div class="grid4" id="cards"></div>
+  </div>
+
+  <table class="table" id="table"><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>浏览量</th><th>有用率</th><th>更新时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+  <div class="pagination"><button class="btn ghost" id="prev">上一页</button><span id="pageInfo" class="muted"></span><button class="btn ghost" id="next">下一页</button></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+mountSidebar('list');
+let state = { page: 1, pageSize: 5, total: 0 };
+
+async function loadCategories() {
+  const categories = await api('/api/categories');
+  category.innerHTML = '<option value="">全部分类</option>' + categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+async function loadMetrics() {
+  const m = await api('/api/metrics/content');
+  cards.innerHTML = `
+    <div class="card metric"><div>总文档数</div><div class="v">${m.totalArticles}</div><div class="muted">已发布 ${m.publishedCount}</div></div>
+    <div class="card metric"><div>本月新增</div><div class="v">${m.monthlyNew}</div></div>
+    <div class="card metric"><div>总浏览量</div><div class="v">${(m.totalViews / 1000).toFixed(1)}k</div></div>
+    <div class="card metric"><div>用户满意度</div><div class="v">${fmtPercent(m.satisfaction)}</div></div>`;
+}
+
+async function loadList() {
+  const params = new URLSearchParams({
+    page: state.page,
+    pageSize: state.pageSize,
+    q: q.value,
+    categoryId: category.value,
+    status: status.value
+  });
+  const result = await api(`/api/articles?${params.toString()}`);
+  state.total = result.total;
+  table.querySelector('tbody').innerHTML = result.list.map(a => `
+    <tr>
+      <td>${a.title}</td>
+      <td><span class="badge">${a.categoryName}</span></td>
+      <td><span class="badge ${a.status}">${a.status}</span></td>
+      <td>${a.views}</td>
+      <td>${fmtPercent(a.usefulRate)}</td>
+      <td>${a.updatedAt}</td>
+      <td>
+        <a href="/edit.html?id=${a.id}">编辑</a> |
+        <a href="#" data-del="${a.id}">删除</a>
+      </td>
+    </tr>`).join('');
+  pageInfo.textContent = `第 ${state.page} 页 / 共 ${Math.ceil(state.total / state.pageSize) || 1} 页`;
+}
+
+table.addEventListener('click', async (e) => {
+  const id = e.target.dataset.del;
+  if (!id) return;
+  e.preventDefault();
+  if (confirm('确定删除这篇文档吗？')) {
+    await api(`/api/articles/${id}`, { method: 'DELETE' });
+    await loadList();
+    await loadMetrics();
+  }
+});
+
+searchBtn.onclick = () => { state.page = 1; loadList(); };
+resetBtn.onclick = () => { q.value = ''; category.value = ''; status.value = ''; state.page = 1; loadList(); };
+prev.onclick = () => { if (state.page > 1) { state.page -= 1; loadList(); } };
+next.onclick = () => { if (state.page < Math.ceil(state.total / state.pageSize)) { state.page += 1; loadList(); } };
+
+(async function init() { await loadCategories(); await loadMetrics(); await loadList(); })();
+</script>
+</body>
+</html>
